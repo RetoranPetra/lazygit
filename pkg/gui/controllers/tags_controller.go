@@ -53,6 +53,11 @@ func (self *TagsController) GetKeybindings(opts types.KeybindingsOpts) []*types.
 			Description: self.c.Tr.ViewResetOptions,
 			OpensMenu:   true,
 		},
+		{
+			Key:         opts.GetKey(opts.Config.Branches.MergeIntoCurrentBranch),
+			Handler:     opts.Guards.OutsideFilterMode(self.withSelectedTag(self.merge)),
+			Description: self.c.Tr.MergeIntoCurrentBranch,
+		},
 	}
 
 	return bindings
@@ -211,6 +216,10 @@ func (self *TagsController) createResetMenu(tag *models.Tag) error {
 func (self *TagsController) create() error {
 	// leaving commit SHA blank so that we're just creating the tag for the current commit
 	return self.c.Helpers().Tags.OpenCreateTagPrompt("", func() { self.context().SetSelectedLineIdx(0) })
+}
+
+func (self *TagsController) merge(tag *models.Tag) error {
+	return self.c.Helpers().MergeAndRebase.MergeRefIntoCheckedOutBranch(tag.RefName())
 }
 
 func (self *TagsController) withSelectedTag(f func(tag *models.Tag) error) func() error {
