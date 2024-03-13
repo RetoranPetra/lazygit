@@ -75,9 +75,11 @@ func (self *TagsController) GetKeybindings(opts types.KeybindingsOpts) []*types.
 			OpensMenu:         true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.MergeIntoCurrentBranch),
-			Handler:     opts.Guards.OutsideFilterMode(self.withSelectedTag(self.merge)),
-			Description: self.c.Tr.MergeIntoCurrentBranch,
+			Key:             opts.GetKey(opts.Config.Branches.MergeIntoCurrentBranch),
+			Handler:         opts.Guards.OutsideFilterMode(self.withItem(self.merge)),
+			Description:     self.c.Tr.Merge,
+			Tooltip:         self.c.Tr.MergeBranchTooltip,
+			DisplayOnScreen: true,
 		},
 	}
 
@@ -236,26 +238,13 @@ func (self *TagsController) createResetMenu(tag *models.Tag) error {
 
 func (self *TagsController) create() error {
 	// leaving commit SHA blank so that we're just creating the tag for the current commit
-	return self.c.Helpers().Tags.OpenCreateTagPrompt("", func() { self.context().SetSelectedLineIdx(0) })
+	return self.c.Helpers().Tags.OpenCreateTagPrompt("", func() {
+		self.context().SetSelection(0)
+	})
 }
 
 func (self *TagsController) merge(tag *models.Tag) error {
 	return self.c.Helpers().MergeAndRebase.MergeRefIntoCheckedOutBranch(tag.RefName())
-}
-
-func (self *TagsController) withSelectedTag(f func(tag *models.Tag) error) func() error {
-	return func() error {
-		tag := self.context().GetSelected()
-		if tag == nil {
-			return nil
-		}
-
-		return f(tag)
-	}
-}
-
-func (self *TagsController) Context() types.Context {
-	return self.context()
 }
 
 func (self *TagsController) context() *context.TagsContext {
