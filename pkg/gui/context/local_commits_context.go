@@ -38,14 +38,14 @@ func NewLocalCommitsContext(c *ContextCommon) *LocalCommitsContext {
 		}
 
 		showYouAreHereLabel := c.Model().WorkingTreeStateAtLastCommitRefresh == enums.REBASE_MODE_REBASING
-		showBranchMarkerForHeadCommit := c.Git().Config.GetRebaseUpdateRefs()
+		hasRebaseUpdateRefsConfig := c.Git().Config.GetRebaseUpdateRefs()
 
 		return presentation.GetCommitListDisplayStrings(
 			c.Common,
 			c.Model().Commits,
 			c.Model().Branches,
 			c.Model().CheckedOutBranch,
-			showBranchMarkerForHeadCommit,
+			hasRebaseUpdateRefsConfig,
 			c.State().GetRepoState().GetScreenMode() != types.SCREEN_NORMAL,
 			c.Modes().CherryPicking.SelectedShaSet(),
 			c.Modes().Diffing.Ref,
@@ -85,20 +85,11 @@ func NewLocalCommitsContext(c *ContextCommon) *LocalCommitsContext {
 	}
 
 	ctx.GetView().SetOnSelectItem(ctx.SearchTrait.onSelectItemWrapper(func(selectedLineIdx int) error {
-		ctx.GetList().SetSelectedLineIdx(selectedLineIdx)
+		ctx.GetList().SetSelection(selectedLineIdx)
 		return ctx.HandleFocus(types.OnFocusOpts{})
 	}))
 
 	return ctx
-}
-
-func (self *LocalCommitsContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.ID()
 }
 
 type LocalCommitsViewModel struct {
@@ -165,7 +156,8 @@ func shouldShowGraph(c *ContextCommon) bool {
 		return false
 	}
 
-	value := c.UserConfig.Git.Log.ShowGraph
+	value := c.GetAppState().GitLogShowGraph
+
 	switch value {
 	case "always":
 		return true

@@ -45,16 +45,6 @@ func NewMenuContext(
 	}
 }
 
-// TODO: remove this thing.
-func (self *MenuContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.Label
-}
-
 type MenuViewModel struct {
 	c               *ContextCommon
 	menuItems       []*types.MenuItem
@@ -71,6 +61,10 @@ func NewMenuViewModel(c *ContextCommon) *MenuViewModel {
 	self.FilteredListViewModel = NewFilteredListViewModel(
 		func() []*types.MenuItem { return self.menuItems },
 		func(item *types.MenuItem) []string { return item.LabelColumns },
+		// The only menu that the user is likely to filter in is the keybindings
+		// menu; retain the sort order in that one because this allows us to
+		// keep the section headers while filtering:
+		func() bool { return true },
 	)
 
 	return self
@@ -90,7 +84,7 @@ func (self *MenuViewModel) GetDisplayStrings(_ int, _ int) [][]string {
 
 	return lo.Map(menuItems, func(item *types.MenuItem, _ int) []string {
 		displayStrings := item.LabelColumns
-		if item.DisabledReason != "" {
+		if item.DisabledReason != nil {
 			displayStrings[0] = style.FgDefault.SetStrikethrough().Sprint(displayStrings[0])
 		}
 
@@ -98,33 +92,13 @@ func (self *MenuViewModel) GetDisplayStrings(_ int, _ int) [][]string {
 			return displayStrings
 		}
 
-		// These keys are used for general navigation so we'll strike them out to
-		// avoid confusion
-		reservedKeys := []string{
-			self.c.UserConfig.Keybinding.Universal.Confirm,
-			self.c.UserConfig.Keybinding.Universal.Select,
-			self.c.UserConfig.Keybinding.Universal.Return,
-			self.c.UserConfig.Keybinding.Universal.StartSearch,
-		}
 		keyLabel := keybindings.LabelFromKey(item.Key)
-		keyStyle := style.FgCyan
-		if lo.Contains(reservedKeys, keyLabel) {
-			keyStyle = style.FgDefault.SetStrikethrough()
-		}
-
-		displayStrings = utils.Prepend(displayStrings, keyStyle.Sprint(keyLabel))
+		displayStrings = utils.Prepend(displayStrings, style.FgCyan.Sprint(keyLabel))
 		return displayStrings
 	})
 }
 
 func (self *MenuViewModel) GetNonModelItems() []*NonModelItem {
-	// Don't display section headers when we are filtering. The reason is that
-	// filtering changes the order of the items (they are sorted by best match),
-	// so all the sections would be messed up.
-	if self.FilteredListViewModel.IsFiltering() {
-		return []*NonModelItem{}
-	}
-
 	result := []*NonModelItem{}
 	menuItems := self.FilteredListViewModel.GetItems()
 	var prevSection *types.MenuSection = nil
@@ -172,8 +146,13 @@ func (self *MenuContext) GetKeybindings(opts types.KeybindingsOpts) []*types.Bin
 }
 
 func (self *MenuContext) OnMenuPress(selectedItem *types.MenuItem) error {
-	if selectedItem != nil && selectedItem.DisabledReason != "" {
-		return self.c.ErrorMsg(selectedItem.DisabledReason)
+	if selectedItem != nil && selectedItem.DisabledReason != nil {
+		if selectedItem.DisabledReason.ShowErrorInPanel {
+			return self.c.ErrorMsg(selectedItem.DisabledReason.Text)
+		}
+
+		self.c.ErrorToast(self.c.Tr.DisabledMenuItemPrefix + selectedItem.DisabledReason.Text)
+		return nil
 	}
 
 	if err := self.c.PopContext(); err != nil {
@@ -189,4 +168,9 @@ func (self *MenuContext) OnMenuPress(selectedItem *types.MenuItem) error {
 	}
 
 	return nil
+}
+
+// There is currently no need to use range-select in a menu so we're disabling it.
+func (self *MenuContext) RangeSelectEnabled() bool {
+	return false
 }

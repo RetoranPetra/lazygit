@@ -24,6 +24,7 @@ func NewReflogCommitsContext(c *ContextCommon) *ReflogCommitsContext {
 		func(commit *models.Commit) []string {
 			return []string{commit.ShortSha(), commit.Name}
 		},
+		func() bool { return true },
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
@@ -57,15 +58,6 @@ func NewReflogCommitsContext(c *ContextCommon) *ReflogCommitsContext {
 			c: c,
 		},
 	}
-}
-
-func (self *ReflogCommitsContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.ID()
 }
 
 func (self *ReflogCommitsContext) CanRebase() bool {

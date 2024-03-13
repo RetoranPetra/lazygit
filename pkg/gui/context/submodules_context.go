@@ -17,8 +17,9 @@ func NewSubmodulesContext(c *ContextCommon) *SubmodulesContext {
 	viewModel := NewFilteredListViewModel(
 		func() []*models.SubmoduleConfig { return c.Model().Submodules },
 		func(submodule *models.SubmoduleConfig) []string {
-			return []string{submodule.Name}
+			return []string{submodule.FullName()}
 		},
+		nil,
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
@@ -42,13 +43,4 @@ func NewSubmodulesContext(c *ContextCommon) *SubmodulesContext {
 			c: c,
 		},
 	}
-}
-
-func (self *SubmodulesContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.ID()
 }

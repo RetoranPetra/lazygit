@@ -22,6 +22,7 @@ func NewBranchesContext(c *ContextCommon) *BranchesContext {
 		func(branch *models.Branch) []string {
 			return []string{branch.Name}
 		},
+		func() bool { return c.AppState.LocalBranchSortOrder != "alphabetical" },
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
@@ -57,15 +58,6 @@ func NewBranchesContext(c *ContextCommon) *BranchesContext {
 	}
 
 	return self
-}
-
-func (self *BranchesContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.ID()
 }
 
 func (self *BranchesContext) GetSelectedRef() types.Ref {

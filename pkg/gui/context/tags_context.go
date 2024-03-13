@@ -24,6 +24,7 @@ func NewTagsContext(
 		func(tag *models.Tag) []string {
 			return []string{tag.Name, tag.Message}
 		},
+		nil,
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
@@ -50,15 +51,6 @@ func NewTagsContext(
 			c: c,
 		},
 	}
-}
-
-func (self *TagsContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.ID()
 }
 
 func (self *TagsContext) GetSelectedRef() types.Ref {

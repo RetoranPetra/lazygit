@@ -39,19 +39,38 @@ func (self *CommitCommands) SetAuthor(value string) error {
 }
 
 // Add a commit's coauthor using Github/Gitlab Co-authored-by metadata. Value is expected to be of the form 'Name <Email>'
-func (self *CommitCommands) AddCoAuthor(sha string, value string) error {
+func (self *CommitCommands) AddCoAuthor(sha string, author string) error {
 	message, err := self.GetCommitMessage(sha)
 	if err != nil {
 		return err
 	}
 
-	message = message + fmt.Sprintf("\nCo-authored-by: %s", value)
+	message = AddCoAuthorToMessage(message, author)
 
 	cmdArgs := NewGitCmd("commit").
 		Arg("--allow-empty", "--amend", "--only", "-m", message).
 		ToArgv()
 
 	return self.cmd.New(cmdArgs).Run()
+}
+
+func AddCoAuthorToMessage(message string, author string) string {
+	subject, body, _ := strings.Cut(message, "\n")
+
+	return strings.TrimSpace(subject) + "\n\n" + AddCoAuthorToDescription(strings.TrimSpace(body), author)
+}
+
+func AddCoAuthorToDescription(description string, author string) string {
+	if description != "" {
+		lines := strings.Split(description, "\n")
+		if strings.HasPrefix(lines[len(lines)-1], "Co-authored-by:") {
+			description += "\n"
+		} else {
+			description += "\n\n"
+		}
+	}
+
+	return description + fmt.Sprintf("Co-authored-by: %s", author)
 }
 
 // ResetToCommit reset to commit
@@ -137,13 +156,21 @@ func (self *CommitCommands) signoffFlag() string {
 }
 
 func (self *CommitCommands) GetCommitMessage(commitSha string) (string, error) {
-	cmdArgs := NewGitCmd("rev-list").
+	cmdArgs := NewGitCmd("log").
 		Arg("--format=%B", "--max-count=1", commitSha).
 		ToArgv()
 
-	messageWithHeader, err := self.cmd.New(cmdArgs).DontLog().RunWithOutput()
-	message := strings.Join(strings.SplitAfter(messageWithHeader, "\n")[1:], "")
-	return strings.TrimSpace(message), err
+	message, err := self.cmd.New(cmdArgs).DontLog().RunWithOutput()
+	return strings.ReplaceAll(strings.TrimSpace(message), "\r\n", "\n"), err
+}
+
+func (self *CommitCommands) GetCommitSubject(commitSha string) (string, error) {
+	cmdArgs := NewGitCmd("log").
+		Arg("--format=%s", "--max-count=1", commitSha).
+		ToArgv()
+
+	subject, err := self.cmd.New(cmdArgs).DontLog().RunWithOutput()
+	return strings.TrimSpace(subject), err
 }
 
 func (self *CommitCommands) GetCommitDiff(commitSha string) (string, error) {
@@ -190,6 +217,20 @@ func (self *CommitCommands) GetCommitMessagesFirstLine(shas []string) (string, e
 	return self.cmd.New(cmdArgs).DontLog().RunWithOutput()
 }
 
+// Example output:
+//
+//	cd50c79ae Preserve the commit message correctly even if the description has blank lines
+//	3ebba5f32 Add test demonstrating a bug with preserving the commit message
+//	9a423c388 Remove unused function
+func (self *CommitCommands) GetShasAndCommitMessagesFirstLine(shas []string) (string, error) {
+	cmdArgs := NewGitCmd("show").
+		Arg("--no-patch", "--pretty=format:%h %s").
+		Arg(shas...).
+		ToArgv()
+
+	return self.cmd.New(cmdArgs).DontLog().RunWithOutput()
+}
+
 func (self *CommitCommands) GetCommitsOneline(shas []string) (string, error) {
 	cmdArgs := NewGitCmd("show").
 		Arg("--no-patch", "--oneline").
@@ -217,6 +258,7 @@ func (self *CommitCommands) ShowCmdObj(sha string, filterPath string) oscommands
 
 	extDiffCmd := self.UserConfig.Git.Paging.ExternalDiffCommand
 	cmdArgs := NewGitCmd("show").
+		Config("diff.noprefix=false").
 		ConfigIf(extDiffCmd != "", "diff.external="+extDiffCmd).
 		ArgIfElse(extDiffCmd != "", "--ext-diff", "--no-ext-diff").
 		Arg("--submodule").
@@ -228,6 +270,7 @@ func (self *CommitCommands) ShowCmdObj(sha string, filterPath string) oscommands
 		Arg(sha).
 		ArgIf(self.AppState.IgnoreWhitespaceInDiffView, "--ignore-all-space").
 		ArgIf(filterPath != "", "--", filterPath).
+		Dir(self.repoPaths.worktreePath).
 		ToArgv()
 
 	return self.cmd.New(cmdArgs).DontLog()

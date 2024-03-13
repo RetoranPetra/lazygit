@@ -19,6 +19,7 @@ func NewWorktreesContext(c *ContextCommon) *WorktreesContext {
 		func(Worktree *models.Worktree) []string {
 			return []string{Worktree.Name}
 		},
+		nil,
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
@@ -45,13 +46,4 @@ func NewWorktreesContext(c *ContextCommon) *WorktreesContext {
 			c: c,
 		},
 	}
-}
-
-func (self *WorktreesContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.ID()
 }

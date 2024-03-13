@@ -22,10 +22,12 @@ func NewRemotesContext(c *ContextCommon) *RemotesContext {
 		func(remote *models.Remote) []string {
 			return []string{remote.Name}
 		},
+		nil,
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
-		return presentation.GetRemoteListDisplayStrings(viewModel.GetItems(), c.Modes().Diffing.Ref)
+		return presentation.GetRemoteListDisplayStrings(
+			viewModel.GetItems(), c.Modes().Diffing.Ref, c.State().GetItemOperation, c.Tr)
 	}
 
 	return &RemotesContext{
@@ -45,15 +47,6 @@ func NewRemotesContext(c *ContextCommon) *RemotesContext {
 			c: c,
 		},
 	}
-}
-
-func (self *RemotesContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.ID()
 }
 
 func (self *RemotesContext) GetDiffTerminals() []string {

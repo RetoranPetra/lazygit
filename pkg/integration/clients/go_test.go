@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/creack/pty"
+	"github.com/jesseduffield/lazycore/pkg/utils"
 	"github.com/jesseduffield/lazygit/pkg/integration/components"
 	"github.com/jesseduffield/lazygit/pkg/integration/tests"
 	"github.com/stretchr/testify/assert"
@@ -28,13 +29,17 @@ func TestIntegration(t *testing.T) {
 	parallelTotal := tryConvert(os.Getenv("PARALLEL_TOTAL"), 1)
 	parallelIndex := tryConvert(os.Getenv("PARALLEL_INDEX"), 0)
 	raceDetector := os.Getenv("LAZYGIT_RACE_DETECTOR") != ""
+	// LAZYGIT_GOCOVERDIR is the directory where we write coverage files to. If this directory
+	// is defined, go binaries built with the -cover flag will write coverage files to
+	// to it.
+	codeCoverageDir := os.Getenv("LAZYGIT_GOCOVERDIR")
 	testNumber := 0
 
-	err := components.RunTests(
-		tests.GetTests(),
-		t.Logf,
-		runCmdHeadless,
-		func(test *components.IntegrationTest, f func() error) {
+	err := components.RunTests(components.RunTestArgs{
+		Tests:  tests.GetTests(utils.GetLazyRootDirectory()),
+		Logf:   t.Logf,
+		RunCmd: runCmdHeadless,
+		TestWrapper: func(test *components.IntegrationTest, f func() error) {
 			defer func() { testNumber += 1 }()
 			if testNumber%parallelTotal != parallelIndex {
 				return
@@ -52,13 +57,14 @@ func TestIntegration(t *testing.T) {
 				assert.NoError(t, err)
 			})
 		},
-		false,
-		false,
-		raceDetector,
-		0,
+		Sandbox:         false,
+		WaitForDebugger: false,
+		RaceDetector:    raceDetector,
+		CodeCoverageDir: codeCoverageDir,
+		InputDelay:      0,
 		// Allow two attempts at each test to get around flakiness
-		2,
-	)
+		MaxAttempts: 2,
+	})
 
 	assert.NoError(t, err)
 }

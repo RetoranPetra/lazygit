@@ -3,8 +3,8 @@
 Default path for the config file:
 
 - Linux: `~/.config/lazygit/config.yml`
-- MacOS: `~/Library/Application Support/lazygit/config.yml`
-- Windows: `%APPDATA%\lazygit\config.yml`
+- MacOS: `~/Library/Application\ Support/lazygit/config.yml`
+- Windows: `%LOCALAPPDATA%\lazygit\config.yml` (default location, but it will also be found in `%APPDATA%\lazygit\config.yml`
 
 For old installations (slightly embarrassing: I didn't realise at the time that you didn't need to supply a vendor name to the path so I just used my name):
 
@@ -40,6 +40,7 @@ gui:
   sidePanelWidth: 0.3333 # number from 0 to 1
   expandFocusedSidePanel: false
   mainPanelSplitMode: 'flexible' # one of 'horizontal' | 'flexible' | 'vertical'
+  enlargedSideViewLocation: 'left' # one of 'left' | 'top'
   language: 'auto' # one of 'auto' | 'en' | 'zh-CN' | 'zh-TW' | 'pl' | 'nl' | 'ja' | 'ko' | 'ru'
   timeFormat: '02 Jan 06' # https://pkg.go.dev/time#Time.Format
   shortTimeFormat: '3:04PM'
@@ -56,8 +57,6 @@ gui:
       - blue
     selectedLineBgColor:
       - blue # set to `default` to have no background colour
-    selectedRangeBgColor:
-      - blue
     cherryPickedCommitBgColor:
       - cyan
     cherryPickedCommitFgColor:
@@ -80,6 +79,7 @@ gui:
   showCommandLog: true
   showIcons: false # deprecated: use nerdFontsVersion instead
   nerdFontsVersion: "" # nerd fonts version to use ("2" or "3"); empty means don't show nerd font icons
+  showFileIcons: true # for hiding file icons in the file views
   commandLogSize: 8
   splitDiff: 'auto' # one of 'auto' | 'always'
   skipRewordInEditorWarning: false # for skipping the confirmation before launching the reword editor
@@ -92,6 +92,8 @@ git:
     useConfig: false
   commit:
     signOff: false
+    autoWrapCommitMessage: true # automatic WYSIWYG wrapping of the commit message as you type
+    autoWrapWidth: 72 # if autoWrapCommitMessage is true, the width to wrap to
   merging:
     # only applicable to unix users
     manualCommit: false
@@ -101,10 +103,14 @@ git:
     # one of date-order, author-date-order, topo-order or default.
     # topo-order makes it easier to read the git log graph, but commits may not
     # appear chronologically. See https://git-scm.com/docs/git-log#_commit_ordering
+    #
+    # Deprecated: Configure this with `Log menu -> Commit sort order` (<c-l> in the commits window by default).
     order: 'topo-order'
     # one of always, never, when-maximised
     # this determines whether the git graph is rendered in the commits panel
-    showGraph: 'when-maximised'
+    #
+    # Deprecated: Configure this with `Log menu -> Show git graph` (<c-l> in the commits window by default).
+    showGraph: 'always'
     # displays the whole git graph by default in the commits panel (equivalent to passing the `--all` argument to `git log`)
     showWholeGraph: false
   skipHookPrefix: WIP
@@ -200,6 +206,9 @@ keybinding:
     toggleWhitespaceInDiffView: '<c-w>'
     increaseContextInDiffView: '}'
     decreaseContextInDiffView: '{'
+    toggleRangeSelect: 'v'
+    rangeSelectUp: '<s-up>'
+    rangeSelectDown: '<s-down>'
   status:
     checkForUpdate: 'u'
     recentRepos: '<enter>'
@@ -208,6 +217,7 @@ keybinding:
     commitChangesWithoutHook: 'w' # commit changes without pre-commit hook
     amendLastCommit: 'A'
     commitChangesWithEditor: 'C'
+    findBaseCommitForFixup: '<c-f>'
     confirmDiscard: 'x'
     ignoreFile: 'i'
     refreshFiles: 'r'
@@ -244,11 +254,11 @@ keybinding:
     moveDownCommit: '<c-j>' # move commit down one
     moveUpCommit: '<c-k>' # move commit up one
     amendToCommit: 'A'
+    amendAttributeMenu: 'a'
     pickCommit: 'p' # pick commit (when mid-rebase)
     revertCommit: 't'
-    cherryPickCopy: 'c'
-    cherryPickCopyRange: 'C'
-    pasteCommits: 'v'
+    cherryPickCopy: 'C'
+    pasteCommits: 'V'
     tagCommit: 'T'
     checkoutCommit: '<space>'
     resetCherryPick: '<c-R>'
@@ -261,14 +271,18 @@ keybinding:
   commitFiles:
     checkoutCommitFile: 'c'
   main:
-    toggleDragSelect: 'v'
-    toggleDragSelect-alt: 'V'
     toggleSelectHunk: 'a'
     pickBothHunks: 'b'
   submodules:
     init: 'i'
     update: 'u'
     bulkMenu: 'b'
+  commitMessage:
+    commitMenu: '<c-o>'
+  amendAttribute:
+    addCoAuthor: 'c'
+    resetAuthor: 'a'
+    setAuthor: 'A'
 ```
 
 ## Platform Defaults
@@ -387,14 +401,12 @@ The available attributes are:
 
 ## Highlighting the selected line
 
-If you don't like the default behaviour of highlighting the selected line with a blue background, you can use the `selectedLineBgColor` and `selectedRangeBgColor` keys to customise the behaviour. If you just want to embolden the selected line (this was the original default), you can do the following:
+If you don't like the default behaviour of highlighting the selected line with a blue background, you can use the `selectedLineBgColor` key to customise the behaviour. If you just want to embolden the selected line (this was the original default), you can do the following:
 
 ```yaml
 gui:
   theme:
     selectedLineBgColor:
-      - default
-    selectedRangeBgColor:
       - default
 ```
 
@@ -404,8 +416,6 @@ You can also use the reverse attribute like so:
 gui:
   theme:
     selectedLineBgColor:
-      - reverse
-    selectedRangeBgColor:
       - reverse
 ```
 

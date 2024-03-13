@@ -78,7 +78,8 @@ func getBranchDisplayStrings(
 		nameTextStyle = theme.DiffTerminalColor
 	}
 
-	if len(displayName) > availableWidth {
+	// Don't bother shortening branch names that are already 3 characters or less
+	if len(displayName) > utils.Max(availableWidth, 3) {
 		// Never shorten the branch name to less then 3 characters
 		len := utils.Max(availableWidth, 4)
 		displayName = displayName[:len-1] + "…"
@@ -163,7 +164,7 @@ func ColoredBranchStatus(branch *models.Branch, itemOperation types.ItemOperatio
 }
 
 func BranchStatus(branch *models.Branch, itemOperation types.ItemOperation, tr *i18n.TranslationSet, now time.Time) string {
-	itemOperationStr := itemOperationToString(itemOperation, tr)
+	itemOperationStr := ItemOperationToString(itemOperation, tr)
 	if itemOperationStr != "" {
 		return itemOperationStr + " " + utils.Loader(now)
 	}

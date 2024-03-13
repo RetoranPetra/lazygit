@@ -19,6 +19,9 @@ import (
 type Shell struct {
 	// working directory the shell is invoked in
 	dir string
+	// passed into each command
+	env []string
+
 	// when running the shell outside the gui we can directly panic on failure,
 	// but inside the gui we need to close the gui before panicking
 	fail func(string)
@@ -26,12 +29,17 @@ type Shell struct {
 	randomFileContentIndex int
 }
 
-func NewShell(dir string, fail func(string)) *Shell {
-	return &Shell{dir: dir, fail: fail}
+func NewShell(dir string, env []string, fail func(string)) *Shell {
+	return &Shell{dir: dir, env: env, fail: fail}
 }
 
 func (self *Shell) RunCommand(args []string) *Shell {
-	output, err := self.runCommandWithOutput(args)
+	return self.RunCommandWithEnv(args, []string{})
+}
+
+// Run a command with additional environment variables set
+func (self *Shell) RunCommandWithEnv(args []string, env []string) *Shell {
+	output, err := self.runCommandWithOutputAndEnv(args, env)
 	if err != nil {
 		self.fail(fmt.Sprintf("error running command: %v\n%s", args, output))
 	}
@@ -49,8 +57,12 @@ func (self *Shell) RunCommandExpectError(args []string) *Shell {
 }
 
 func (self *Shell) runCommandWithOutput(args []string) (string, error) {
+	return self.runCommandWithOutputAndEnv(args, []string{})
+}
+
+func (self *Shell) runCommandWithOutputAndEnv(args []string, env []string) (string, error) {
 	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Env = os.Environ()
+	cmd.Env = append(self.env, env...)
 	cmd.Dir = self.dir
 
 	output, err := cmd.CombinedOutput()
@@ -162,6 +174,14 @@ func (self *Shell) EmptyCommit(message string) *Shell {
 
 func (self *Shell) EmptyCommitDaysAgo(message string, daysAgo int) *Shell {
 	return self.RunCommand([]string{"git", "commit", "--allow-empty", "--date", fmt.Sprintf("%d days ago", daysAgo), "-m", message})
+}
+
+func (self *Shell) EmptyCommitWithDate(message string, date string) *Shell {
+	env := []string{
+		"GIT_AUTHOR_DATE=" + date,
+		"GIT_COMMITTER_DATE=" + date,
+	}
+	return self.RunCommandWithEnv([]string{"git", "commit", "--allow-empty", "-m", message}, env)
 }
 
 func (self *Shell) Revert(ref string) *Shell {
@@ -325,9 +345,9 @@ func (self *Shell) CloneIntoRemote(name string) *Shell {
 	return self
 }
 
-func (self *Shell) CloneIntoSubmodule(submoduleName string) *Shell {
+func (self *Shell) CloneIntoSubmodule(submoduleName string, submodulePath string) *Shell {
 	self.Clone("other_repo")
-	self.RunCommand([]string{"git", "submodule", "add", "../other_repo", submoduleName})
+	self.RunCommand([]string{"git", "submodule", "add", "--name", submoduleName, "../other_repo", submodulePath})
 
 	return self
 }
@@ -445,8 +465,8 @@ func (self *Shell) CopyFile(source string, destination string) *Shell {
 	return self
 }
 
-// NOTE: this only takes effect before running the test;
-// the test will still run in the original directory
+// The final value passed to Chdir() during setup
+// will be the directory the test is run from.
 func (self *Shell) Chdir(path string) *Shell {
 	self.dir = filepath.Join(self.dir, path)
 

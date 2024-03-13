@@ -10,48 +10,69 @@ import (
 
 type TagsController struct {
 	baseController
+	*ListControllerTrait[*models.Tag]
 	c *ControllerCommon
 }
 
 var _ types.IController = &TagsController{}
 
 func NewTagsController(
-	common *ControllerCommon,
+	c *ControllerCommon,
 ) *TagsController {
 	return &TagsController{
 		baseController: baseController{},
-		c:              common,
+		ListControllerTrait: NewListControllerTrait[*models.Tag](
+			c,
+			c.Contexts().Tags,
+			c.Contexts().Tags.GetSelected,
+			c.Contexts().Tags.GetSelectedItems,
+		),
+		c: c,
 	}
 }
 
 func (self *TagsController) GetKeybindings(opts types.KeybindingsOpts) []*types.Binding {
 	bindings := []*types.Binding{
 		{
-			Key:         opts.GetKey(opts.Config.Universal.Select),
-			Handler:     self.withSelectedTag(self.checkout),
-			Description: self.c.Tr.Checkout,
+			Key:               opts.GetKey(opts.Config.Universal.Select),
+			Handler:           self.withItem(self.checkout),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.Checkout,
+			Tooltip:           self.c.Tr.TagCheckoutTooltip,
+			DisplayOnScreen:   true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Universal.Remove),
-			Handler:     self.withSelectedTag(self.delete),
-			Description: self.c.Tr.ViewDeleteOptions,
-			OpensMenu:   true,
+			Key:             opts.GetKey(opts.Config.Universal.New),
+			Handler:         self.create,
+			Description:     self.c.Tr.NewTag,
+			Tooltip:         self.c.Tr.NewTagTooltip,
+			DisplayOnScreen: true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.PushTag),
-			Handler:     self.withSelectedTag(self.push),
-			Description: self.c.Tr.PushTag,
+			Key:               opts.GetKey(opts.Config.Universal.Remove),
+			Handler:           self.withItem(self.delete),
+			Description:       self.c.Tr.Delete,
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Tooltip:           self.c.Tr.TagDeleteTooltip,
+			OpensMenu:         true,
+			DisplayOnScreen:   true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Universal.New),
-			Handler:     self.create,
-			Description: self.c.Tr.CreateTag,
+			Key:               opts.GetKey(opts.Config.Branches.PushTag),
+			Handler:           self.withItem(self.push),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.PushTag,
+			Tooltip:           self.c.Tr.PushTagTooltip,
+			DisplayOnScreen:   true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Commits.ViewResetOptions),
-			Handler:     self.withSelectedTag(self.createResetMenu),
-			Description: self.c.Tr.ViewResetOptions,
-			OpensMenu:   true,
+			Key:               opts.GetKey(opts.Config.Commits.ViewResetOptions),
+			Handler:           self.withItem(self.createResetMenu),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.Reset,
+			Tooltip:           self.c.Tr.ResetTooltip,
+			DisplayOnScreen:   true,
+			OpensMenu:         true,
 		},
 		{
 			Key:         opts.GetKey(opts.Config.Branches.MergeIntoCurrentBranch),
@@ -88,7 +109,7 @@ func (self *TagsController) GetOnRenderToMain() func() error {
 
 func (self *TagsController) checkout(tag *models.Tag) error {
 	self.c.LogAction(self.c.Tr.Actions.CheckoutTag)
-	if err := self.c.Helpers().Refs.CheckoutRef(tag.Name, types.CheckoutRefOptions{}); err != nil {
+	if err := self.c.Helpers().Refs.CheckoutRef(tag.FullRefName(), types.CheckoutRefOptions{}); err != nil {
 		return err
 	}
 	return self.c.PushContext(self.c.Contexts().Branches)

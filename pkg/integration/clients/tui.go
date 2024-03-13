@@ -233,7 +233,7 @@ type app struct {
 }
 
 func newApp(testDir string) *app {
-	return &app{testDir: testDir, allTests: tests.GetTests()}
+	return &app{testDir: testDir, allTests: tests.GetTests(utils.GetLazyRootDirectory())}
 }
 
 func (self *app) getCurrentTest() *components.IntegrationTest {
@@ -385,17 +385,18 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 }
 
 func runTuiTest(test *components.IntegrationTest, sandbox bool, waitForDebugger bool, raceDetector bool, inputDelay int) {
-	err := components.RunTests(
-		[]*components.IntegrationTest{test},
-		log.Printf,
-		runCmdInTerminal,
-		runAndPrintError,
-		sandbox,
-		waitForDebugger,
-		raceDetector,
-		inputDelay,
-		1,
-	)
+	err := components.RunTests(components.RunTestArgs{
+		Tests:           []*components.IntegrationTest{test},
+		Logf:            log.Printf,
+		RunCmd:          runCmdInTerminal,
+		TestWrapper:     runAndPrintError,
+		Sandbox:         sandbox,
+		WaitForDebugger: waitForDebugger,
+		RaceDetector:    raceDetector,
+		CodeCoverageDir: "",
+		InputDelay:      inputDelay,
+		MaxAttempts:     1,
+	})
 	if err != nil {
 		log.Println(err.Error())
 	}

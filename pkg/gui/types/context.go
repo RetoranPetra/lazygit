@@ -136,6 +136,8 @@ type IListContext interface {
 	Context
 
 	GetSelectedItemId() string
+	GetSelectedItemIds() ([]string, int, int)
+	IsItemVisible(item HasUrn) bool
 
 	GetList() IList
 	ViewIndexToModelIndex(int) int
@@ -143,6 +145,7 @@ type IListContext interface {
 
 	FocusLine()
 	IsListContext() // used for type switch
+	RangeSelectEnabled() bool
 }
 
 type IPatchExplorerContext interface {
@@ -162,6 +165,8 @@ type IPatchExplorerContext interface {
 
 type IViewTrait interface {
 	FocusPoint(yIdx int)
+	SetRangeSelectStart(yIdx int)
+	CancelRangeSelect()
 	SetViewPortContent(content string)
 	SetContent(content string)
 	SetFooter(value string)
@@ -215,17 +220,27 @@ type IController interface {
 type IList interface {
 	IListCursor
 	Len() int
+	GetItem(index int) HasUrn
 }
 
 type IListCursor interface {
 	GetSelectedLineIdx() int
 	SetSelectedLineIdx(value int)
+	SetSelection(value int)
 	MoveSelectedLine(delta int)
-	RefreshSelectedIdx()
+	ClampSelection()
+	CancelRangeSelect()
+	GetRangeStartIdx() (int, bool)
+	GetSelectionRange() (int, int)
+	IsSelectingRange() bool
+	AreMultipleItemsSelected() bool
+	ToggleStickyRange()
+	ExpandNonStickyRange(int)
 }
 
 type IListPanelState interface {
 	SetSelectedLineIdx(int)
+	SetSelection(int)
 	GetSelectedLineIdx() int
 }
 

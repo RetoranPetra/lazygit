@@ -126,7 +126,7 @@ func (self *RefreshHelper) Refresh(options types.RefreshOptions) error {
 			refresh("commits and commit files", self.refreshCommitsAndCommitFiles)
 
 			includeWorktreesWithBranches = scopeSet.Includes(types.WORKTREES)
-			refresh("reflog and branches", func() { self.refreshReflogAndBranches(includeWorktreesWithBranches) })
+			refresh("reflog and branches", func() { self.refreshReflogAndBranches(includeWorktreesWithBranches, options.KeepBranchSelectionIndex) })
 		} else if scopeSet.Includes(types.REBASE_COMMITS) {
 			// the above block handles rebase commits so we only need to call this one
 			// if we've asked specifically for rebase commits and not those other things
@@ -248,7 +248,7 @@ func (self *RefreshHelper) refreshReflogCommitsConsideringStartup() {
 	case types.INITIAL:
 		self.c.OnWorker(func(_ gocui.Task) {
 			_ = self.refreshReflogCommits()
-			self.refreshBranches(false)
+			self.refreshBranches(false, true)
 			self.c.State().GetRepoState().SetStartupStage(types.COMPLETE)
 		})
 
@@ -257,10 +257,10 @@ func (self *RefreshHelper) refreshReflogCommitsConsideringStartup() {
 	}
 }
 
-func (self *RefreshHelper) refreshReflogAndBranches(refreshWorktrees bool) {
+func (self *RefreshHelper) refreshReflogAndBranches(refreshWorktrees bool, keepBranchSelectionIndex bool) {
 	self.refreshReflogCommitsConsideringStartup()
 
-	self.refreshBranches(refreshWorktrees)
+	self.refreshBranches(refreshWorktrees, keepBranchSelectionIndex)
 }
 
 func (self *RefreshHelper) refreshCommitsAndCommitFiles() {
@@ -274,7 +274,7 @@ func (self *RefreshHelper) refreshCommitsAndCommitFiles() {
 		// or perhaps we could just pop that context off the stack whenever cycling windows.
 		// For now the awkwardness remains.
 		commit := self.c.Contexts().LocalCommits.GetSelected()
-		if commit != nil {
+		if commit != nil && commit.RefName() != "" {
 			self.c.Contexts().CommitFiles.SetRef(commit)
 			self.c.Contexts().CommitFiles.SetTitleRef(commit.RefName())
 			_ = self.refreshCommitFilesContext()
@@ -317,6 +317,7 @@ func (self *RefreshHelper) refreshCommitsWithLimit() error {
 		git_commands.GetCommitsOptions{
 			Limit:                self.c.Contexts().LocalCommits.GetLimitCommits(),
 			FilterPath:           self.c.Modes().Filtering.GetPath(),
+			FilterAuthor:         self.c.Modes().Filtering.GetAuthor(),
 			IncludeRebaseCommits: true,
 			RefName:              self.refForLog(),
 			RefForPushedStatus:   checkedOutBranchName,
@@ -342,6 +343,7 @@ func (self *RefreshHelper) refreshSubCommitsWithLimit() error {
 		git_commands.GetCommitsOptions{
 			Limit:                   self.c.Contexts().SubCommits.GetLimitCommits(),
 			FilterPath:              self.c.Modes().Filtering.GetPath(),
+			FilterAuthor:            self.c.Modes().Filtering.GetAuthor(),
 			IncludeRebaseCommits:    false,
 			RefName:                 self.c.Contexts().SubCommits.GetRef().FullRefName(),
 			RefToShowDivergenceFrom: self.c.Contexts().SubCommits.GetRefToShowDivergenceFrom(),
@@ -413,7 +415,7 @@ func (self *RefreshHelper) refreshTags() error {
 }
 
 func (self *RefreshHelper) refreshStateSubmoduleConfigs() error {
-	configs, err := self.c.Git().Submodule.GetConfigs()
+	configs, err := self.c.Git().Submodule.GetConfigs(nil)
 	if err != nil {
 		return err
 	}
@@ -425,18 +427,20 @@ func (self *RefreshHelper) refreshStateSubmoduleConfigs() error {
 
 // self.refreshStatus is called at the end of this because that's when we can
 // be sure there is a State.Model.Branches array to pick the current branch from
-func (self *RefreshHelper) refreshBranches(refreshWorktrees bool) {
+func (self *RefreshHelper) refreshBranches(refreshWorktrees bool, keepBranchSelectionIndex bool) {
 	self.c.Mutexes().RefreshingBranchesMutex.Lock()
 	defer self.c.Mutexes().RefreshingBranchesMutex.Unlock()
 
+	prevSelectedBranch := self.c.Contexts().Branches.GetSelected()
+
 	reflogCommits := self.c.Model().FilteredReflogCommits
-	if self.c.Modes().Filtering.Active() {
+	if self.c.Modes().Filtering.Active() && self.c.AppState.LocalBranchSortOrder == "recency" {
 		// in filter mode we filter our reflog commits to just those containing the path
 		// however we need all the reflog entries to populate the recencies of our branches
 		// which allows us to order them correctly. So if we're filtering we'll just
 		// manually load all the reflog commits here
 		var err error
-		reflogCommits, _, err = self.c.Git().Loaders.ReflogCommitLoader.GetReflogCommits(nil, "")
+		reflogCommits, _, err = self.c.Git().Loaders.ReflogCommitLoader.GetReflogCommits(nil, "", "")
 		if err != nil {
 			self.c.Log.Error(err)
 		}
@@ -453,6 +457,14 @@ func (self *RefreshHelper) refreshBranches(refreshWorktrees bool) {
 		self.loadWorktrees()
 		if err := self.refreshView(self.c.Contexts().Worktrees); err != nil {
 			self.c.Log.Error(err)
+		}
+	}
+
+	if !keepBranchSelectionIndex && prevSelectedBranch != nil {
+		_, idx, found := lo.FindIndexOf(self.c.Contexts().Branches.GetItems(),
+			func(b *models.Branch) bool { return b.Name == prevSelectedBranch.Name })
+		if found {
+			self.c.Contexts().Branches.SetSelectedLineIdx(idx)
 		}
 	}
 
@@ -587,9 +599,9 @@ func (self *RefreshHelper) refreshReflogCommits() error {
 		lastReflogCommit = model.ReflogCommits[0]
 	}
 
-	refresh := func(stateCommits *[]*models.Commit, filterPath string) error {
+	refresh := func(stateCommits *[]*models.Commit, filterPath string, filterAuthor string) error {
 		commits, onlyObtainedNewReflogCommits, err := self.c.Git().Loaders.ReflogCommitLoader.
-			GetReflogCommits(lastReflogCommit, filterPath)
+			GetReflogCommits(lastReflogCommit, filterPath, filterAuthor)
 		if err != nil {
 			return self.c.Error(err)
 		}
@@ -602,12 +614,12 @@ func (self *RefreshHelper) refreshReflogCommits() error {
 		return nil
 	}
 
-	if err := refresh(&model.ReflogCommits, ""); err != nil {
+	if err := refresh(&model.ReflogCommits, "", ""); err != nil {
 		return err
 	}
 
 	if self.c.Modes().Filtering.Active() {
-		if err := refresh(&model.FilteredReflogCommits, self.c.Modes().Filtering.GetPath()); err != nil {
+		if err := refresh(&model.FilteredReflogCommits, self.c.Modes().Filtering.GetPath(), self.c.Modes().Filtering.GetAuthor()); err != nil {
 			return err
 		}
 	} else {

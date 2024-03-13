@@ -17,103 +17,147 @@ import (
 
 type BranchesController struct {
 	baseController
+	*ListControllerTrait[*models.Branch]
 	c *ControllerCommon
 }
 
 var _ types.IController = &BranchesController{}
 
 func NewBranchesController(
-	common *ControllerCommon,
+	c *ControllerCommon,
 ) *BranchesController {
 	return &BranchesController{
 		baseController: baseController{},
-		c:              common,
+		c:              c,
+		ListControllerTrait: NewListControllerTrait[*models.Branch](
+			c,
+			c.Contexts().Branches,
+			c.Contexts().Branches.GetSelected,
+			c.Contexts().Branches.GetSelectedItems,
+		),
 	}
 }
 
 func (self *BranchesController) GetKeybindings(opts types.KeybindingsOpts) []*types.Binding {
 	return []*types.Binding{
 		{
-			Key:               opts.GetKey(opts.Config.Universal.Select),
-			Handler:           self.checkSelected(self.press),
-			GetDisabledReason: self.getDisabledReasonForPress,
-			Description:       self.c.Tr.Checkout,
+			Key:     opts.GetKey(opts.Config.Universal.Select),
+			Handler: self.withItem(self.press),
+			GetDisabledReason: self.require(
+				self.singleItemSelected(),
+				self.notPulling,
+			),
+			Description:     self.c.Tr.Checkout,
+			Tooltip:         self.c.Tr.CheckoutTooltip,
+			DisplayOnScreen: true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Universal.New),
-			Handler:     self.checkSelected(self.newBranch),
-			Description: self.c.Tr.NewBranch,
+			Key:               opts.GetKey(opts.Config.Universal.New),
+			Handler:           self.withItem(self.newBranch),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.NewBranch,
+			DisplayOnScreen:   true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.CreatePullRequest),
-			Handler:     self.checkSelected(self.handleCreatePullRequest),
-			Description: self.c.Tr.CreatePullRequest,
+			Key:               opts.GetKey(opts.Config.Branches.CreatePullRequest),
+			Handler:           self.withItem(self.handleCreatePullRequest),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.CreatePullRequest,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.ViewPullRequestOptions),
-			Handler:     self.checkSelected(self.handleCreatePullRequestMenu),
-			Description: self.c.Tr.CreatePullRequestOptions,
-			OpensMenu:   true,
+			Key:               opts.GetKey(opts.Config.Branches.ViewPullRequestOptions),
+			Handler:           self.withItem(self.handleCreatePullRequestMenu),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.CreatePullRequestOptions,
+			OpensMenu:         true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.CopyPullRequestURL),
-			Handler:     self.copyPullRequestURL,
-			Description: self.c.Tr.CopyPullRequestURL,
+			Key:               opts.GetKey(opts.Config.Branches.CopyPullRequestURL),
+			Handler:           self.copyPullRequestURL,
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.CopyPullRequestURL,
 		},
 		{
 			Key:         opts.GetKey(opts.Config.Branches.CheckoutBranchByName),
 			Handler:     self.checkoutByName,
 			Description: self.c.Tr.CheckoutByName,
+			Tooltip:     self.c.Tr.CheckoutByNameTooltip,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.ForceCheckoutBranch),
-			Handler:     self.forceCheckout,
-			Description: self.c.Tr.ForceCheckout,
+			Key:               opts.GetKey(opts.Config.Branches.ForceCheckoutBranch),
+			Handler:           self.forceCheckout,
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.ForceCheckout,
+			Tooltip:           self.c.Tr.ForceCheckoutTooltip,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Universal.Remove),
-			Handler:     self.checkSelectedAndReal(self.delete),
-			Description: self.c.Tr.ViewDeleteOptions,
-			OpensMenu:   true,
+			Key:               opts.GetKey(opts.Config.Universal.Remove),
+			Handler:           self.withItem(self.delete),
+			GetDisabledReason: self.require(self.singleItemSelected(self.branchIsReal)),
+			Description:       self.c.Tr.Delete,
+			Tooltip:           self.c.Tr.BranchDeleteTooltip,
+			OpensMenu:         true,
+			DisplayOnScreen:   true,
 		},
 		{
-			Key:               opts.GetKey(opts.Config.Branches.RebaseBranch),
-			Handler:           opts.Guards.OutsideFilterMode(self.rebase),
-			Description:       self.c.Tr.RebaseBranch,
-			GetDisabledReason: self.getDisabledReasonForRebase,
+			Key:     opts.GetKey(opts.Config.Branches.RebaseBranch),
+			Handler: opts.Guards.OutsideFilterMode(self.rebase),
+			GetDisabledReason: self.require(
+				self.singleItemSelected(self.notRebasingOntoSelf),
+			),
+			Description:     self.c.Tr.RebaseBranch,
+			Tooltip:         self.c.Tr.RebaseBranchTooltip,
+			DisplayOnScreen: true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.MergeIntoCurrentBranch),
-			Handler:     opts.Guards.OutsideFilterMode(self.merge),
-			Description: self.c.Tr.MergeIntoCurrentBranch,
+			Key:               opts.GetKey(opts.Config.Branches.MergeIntoCurrentBranch),
+			Handler:           opts.Guards.OutsideFilterMode(self.merge),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.Merge,
+			Tooltip:           self.c.Tr.MergeBranchTooltip,
+			DisplayOnScreen:   true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.FastForward),
-			Handler:     self.checkSelectedAndReal(self.fastForward),
-			Description: self.c.Tr.FastForward,
+			Key:               opts.GetKey(opts.Config.Branches.FastForward),
+			Handler:           self.withItem(self.fastForward),
+			GetDisabledReason: self.require(self.singleItemSelected(self.branchIsReal)),
+			Description:       self.c.Tr.FastForward,
+			Tooltip:           self.c.Tr.FastForwardTooltip,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.CreateTag),
-			Handler:     self.checkSelected(self.createTag),
-			Description: self.c.Tr.CreateTag,
+			Key:               opts.GetKey(opts.Config.Branches.CreateTag),
+			Handler:           self.withItem(self.createTag),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.NewTag,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Commits.ViewResetOptions),
-			Handler:     self.checkSelected(self.createResetMenu),
-			Description: self.c.Tr.ViewResetOptions,
-			OpensMenu:   true,
+			Key:         opts.GetKey(opts.Config.Branches.SortOrder),
+			Handler:     self.createSortMenu,
+			Description: self.c.Tr.SortOrder,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.RenameBranch),
-			Handler:     self.checkSelectedAndReal(self.rename),
-			Description: self.c.Tr.RenameBranch,
+			Key:               opts.GetKey(opts.Config.Commits.ViewResetOptions),
+			Handler:           self.withItem(self.createResetMenu),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.ViewResetOptions,
+			OpensMenu:         true,
+			DisplayOnScreen:   true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Branches.SetUpstream),
-			Handler:     self.checkSelected(self.viewUpstreamOptions),
-			Description: self.c.Tr.ViewBranchUpstreamOptions,
-			Tooltip:     self.c.Tr.ViewBranchUpstreamOptionsTooltip,
-			OpensMenu:   true,
+			Key:               opts.GetKey(opts.Config.Branches.RenameBranch),
+			Handler:           self.withItem(self.rename),
+			GetDisabledReason: self.require(self.singleItemSelected(self.branchIsReal)),
+			Description:       self.c.Tr.RenameBranch,
+		},
+		{
+			Key:               opts.GetKey(opts.Config.Branches.SetUpstream),
+			Handler:           self.withItem(self.viewUpstreamOptions),
+			GetDisabledReason: self.require(self.singleItemSelected()),
+			Description:       self.c.Tr.ViewBranchUpstreamOptions,
+			Tooltip:           self.c.Tr.ViewBranchUpstreamOptionsTooltip,
+			ShortDescription:  self.c.Tr.Upstream,
+			OpensMenu:         true,
+			DisplayOnScreen:   true,
 		},
 	}
 }
@@ -159,7 +203,6 @@ func (self *BranchesController) viewUpstreamOptions(selectedBranch *models.Branc
 				ShowBranchHeads:         false,
 			})
 		},
-		Key: 'v',
 	}
 
 	unsetUpstreamItem := &types.MenuItem{
@@ -257,11 +300,14 @@ func (self *BranchesController) viewUpstreamOptions(selectedBranch *models.Branc
 		Key:     'r',
 	}
 
+	if !selectedBranch.IsTrackingRemote() {
+		unsetUpstreamItem.DisabledReason = &types.DisabledReason{Text: self.c.Tr.UpstreamNotSetError}
+	}
+
 	if !selectedBranch.RemoteBranchStoredLocally() {
-		viewDivergenceItem.DisabledReason = self.c.Tr.UpstreamNotSetError
-		unsetUpstreamItem.DisabledReason = self.c.Tr.UpstreamNotSetError
-		upstreamResetItem.DisabledReason = self.c.Tr.UpstreamNotSetError
-		upstreamRebaseItem.DisabledReason = self.c.Tr.UpstreamNotSetError
+		viewDivergenceItem.DisabledReason = &types.DisabledReason{Text: self.c.Tr.UpstreamNotSetError}
+		upstreamResetItem.DisabledReason = &types.DisabledReason{Text: self.c.Tr.UpstreamNotSetError}
+		upstreamRebaseItem.DisabledReason = &types.DisabledReason{Text: self.c.Tr.UpstreamNotSetError}
 	}
 
 	options := []*types.MenuItem{
@@ -300,16 +346,16 @@ func (self *BranchesController) press(selectedBranch *models.Branch) error {
 	return self.c.Helpers().Refs.CheckoutRef(selectedBranch.Name, types.CheckoutRefOptions{})
 }
 
-func (self *BranchesController) getDisabledReasonForPress() string {
+func (self *BranchesController) notPulling() *types.DisabledReason {
 	currentBranch := self.c.Helpers().Refs.GetCheckedOutRef()
 	if currentBranch != nil {
 		op := self.c.State().GetItemOperation(currentBranch)
 		if op == types.ItemOperationFastForwarding || op == types.ItemOperationPulling {
-			return self.c.Tr.CantCheckoutBranchWhilePulling
+			return &types.DisabledReason{Text: self.c.Tr.CantCheckoutBranchWhilePulling}
 		}
 	}
 
-	return ""
+	return nil
 }
 
 func (self *BranchesController) worktreeForBranch(branch *models.Branch) (*models.Worktree, bool) {
@@ -416,8 +462,8 @@ func (self *BranchesController) createNewBranchWithName(newBranchName string) er
 		return self.c.Error(err)
 	}
 
-	self.context().SetSelectedLineIdx(0)
-	return self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC})
+	self.context().SetSelection(0)
+	return self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC, KeepBranchSelectionIndex: true})
 }
 
 func (self *BranchesController) checkedOutByOtherWorktree(branch *models.Branch) bool {
@@ -516,7 +562,7 @@ func (self *BranchesController) delete(branch *models.Branch) error {
 		},
 	}
 	if checkedOutBranch.Name == branch.Name {
-		localDeleteItem.DisabledReason = self.c.Tr.CantDeleteCheckOutBranch
+		localDeleteItem.DisabledReason = &types.DisabledReason{Text: self.c.Tr.CantDeleteCheckOutBranch}
 	}
 
 	remoteDeleteItem := &types.MenuItem{
@@ -527,7 +573,7 @@ func (self *BranchesController) delete(branch *models.Branch) error {
 		},
 	}
 	if !branch.IsTrackingRemote() || branch.UpstreamGone {
-		remoteDeleteItem.DisabledReason = self.c.Tr.UpstreamNotSetError
+		remoteDeleteItem.DisabledReason = &types.DisabledReason{Text: self.c.Tr.UpstreamNotSetError}
 	}
 
 	menuTitle := utils.ResolvePlaceholderString(
@@ -553,14 +599,14 @@ func (self *BranchesController) rebase() error {
 	return self.c.Helpers().MergeAndRebase.RebaseOntoRef(selectedBranchName)
 }
 
-func (self *BranchesController) getDisabledReasonForRebase() string {
-	selectedBranchName := self.context().GetSelected().Name
+func (self *BranchesController) notRebasingOntoSelf(branch *models.Branch) *types.DisabledReason {
+	selectedBranchName := branch.Name
 	checkedOutBranch := self.c.Helpers().Refs.GetCheckedOutRef().Name
 	if selectedBranchName == checkedOutBranch {
-		return self.c.Tr.CantRebaseOntoSelf
+		return &types.DisabledReason{Text: self.c.Tr.CantRebaseOntoSelf}
 	}
 
-	return ""
+	return nil
 }
 
 func (self *BranchesController) fastForward(branch *models.Branch) error {
@@ -614,6 +660,18 @@ func (self *BranchesController) createTag(branch *models.Branch) error {
 	return self.c.Helpers().Tags.OpenCreateTagPrompt(branch.FullRefName(), func() {})
 }
 
+func (self *BranchesController) createSortMenu() error {
+	return self.c.Helpers().Refs.CreateSortOrderMenu([]string{"recency", "alphabetical", "date"}, func(sortOrder string) error {
+		if self.c.GetAppState().LocalBranchSortOrder != sortOrder {
+			self.c.GetAppState().LocalBranchSortOrder = sortOrder
+			self.c.SaveAppStateAndLogError()
+			self.c.Contexts().Branches.SetSelection(0)
+			return self.c.Refresh(types.RefreshOptions{Mode: types.ASYNC, Scope: []types.RefreshableView{types.BRANCHES}})
+		}
+		return nil
+	})
+}
+
 func (self *BranchesController) createResetMenu(selectedBranch *models.Branch) error {
 	return self.c.Helpers().Refs.CreateGitResetMenu(selectedBranch.Name)
 }
@@ -638,7 +696,7 @@ func (self *BranchesController) rename(branch *models.Branch) error {
 				// now that we've got our stuff again we need to find that branch and reselect it.
 				for i, newBranch := range self.c.Model().Branches {
 					if newBranch.Name == newBranchName {
-						self.context().SetSelectedLineIdx(i)
+						self.context().SetSelection(i)
 						if err := self.context().HandleRender(); err != nil {
 							return err
 						}
@@ -733,24 +791,10 @@ func (self *BranchesController) createPullRequest(from string, to string) error 
 	return nil
 }
 
-func (self *BranchesController) checkSelected(callback func(*models.Branch) error) func() error {
-	return func() error {
-		selectedItem := self.context().GetSelected()
-		if selectedItem == nil {
-			return nil
-		}
-
-		return callback(selectedItem)
+func (self *BranchesController) branchIsReal(branch *models.Branch) *types.DisabledReason {
+	if !branch.IsRealBranch() {
+		return &types.DisabledReason{Text: self.c.Tr.SelectedItemIsNotABranch}
 	}
-}
 
-func (self *BranchesController) checkSelectedAndReal(callback func(*models.Branch) error) func() error {
-	return func() error {
-		selectedItem := self.context().GetSelected()
-		if selectedItem == nil || !selectedItem.IsRealBranch() {
-			return nil
-		}
-
-		return callback(selectedItem)
-	}
+	return nil
 }

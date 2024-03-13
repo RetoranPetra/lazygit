@@ -24,6 +24,7 @@ func NewStashContext(
 		func(stashEntry *models.StashEntry) []string {
 			return []string{stashEntry.Name}
 		},
+		func() bool { return true },
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
@@ -47,15 +48,6 @@ func NewStashContext(
 			c: c,
 		},
 	}
-}
-
-func (self *StashContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.ID()
 }
 
 func (self *StashContext) CanRebase() bool {

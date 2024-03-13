@@ -31,11 +31,11 @@ type ContextLinesController struct {
 var _ types.IController = &ContextLinesController{}
 
 func NewContextLinesController(
-	common *ControllerCommon,
+	c *ControllerCommon,
 ) *ContextLinesController {
 	return &ContextLinesController{
 		baseController: baseController{},
-		c:              common,
+		c:              c,
 	}
 }
 
@@ -45,11 +45,13 @@ func (self *ContextLinesController) GetKeybindings(opts types.KeybindingsOpts) [
 			Key:         opts.GetKey(opts.Config.Universal.IncreaseContextInDiffView),
 			Handler:     self.Increase,
 			Description: self.c.Tr.IncreaseContextInDiffView,
+			Tooltip:     self.c.Tr.IncreaseContextInDiffViewTooltip,
 		},
 		{
 			Key:         opts.GetKey(opts.Config.Universal.DecreaseContextInDiffView),
 			Handler:     self.Decrease,
 			Description: self.c.Tr.DecreaseContextInDiffView,
+			Tooltip:     self.c.Tr.DecreaseContextInDiffViewTooltip,
 		},
 	}
 

@@ -4,6 +4,7 @@ import (
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/gui/presentation"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
+	"github.com/samber/lo"
 )
 
 type RemoteBranchesContext struct {
@@ -25,6 +26,7 @@ func NewRemoteBranchesContext(
 		func(remoteBranch *models.RemoteBranch) []string {
 			return []string{remoteBranch.Name}
 		},
+		func() bool { return c.AppState.RemoteBranchSortOrder != "alphabetical" },
 	)
 
 	getDisplayStrings := func(_ int, _ int) [][]string {
@@ -53,21 +55,22 @@ func NewRemoteBranchesContext(
 	}
 }
 
-func (self *RemoteBranchesContext) GetSelectedItemId() string {
-	item := self.GetSelected()
-	if item == nil {
-		return ""
-	}
-
-	return item.ID()
-}
-
 func (self *RemoteBranchesContext) GetSelectedRef() types.Ref {
 	remoteBranch := self.GetSelected()
 	if remoteBranch == nil {
 		return nil
 	}
 	return remoteBranch
+}
+
+func (self *RemoteBranchesContext) GetSelectedRefs() ([]types.Ref, int, int) {
+	items, startIdx, endIdx := self.GetSelectedItems()
+
+	refs := lo.Map(items, func(item *models.RemoteBranch, _ int) types.Ref {
+		return item
+	})
+
+	return refs, startIdx, endIdx
 }
 
 func (self *RemoteBranchesContext) GetDiffTerminals() []string {
