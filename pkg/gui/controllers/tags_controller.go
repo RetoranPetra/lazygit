@@ -78,7 +78,7 @@ func (self *TagsController) GetKeybindings(opts types.KeybindingsOpts) []*types.
 			Key:             opts.GetKey(opts.Config.Branches.MergeIntoCurrentBranch),
 			Handler:         opts.Guards.OutsideFilterMode(self.withItem(self.merge)),
 			Description:     self.c.Tr.Merge,
-			Tooltip:         self.c.Tr.MergeBranchTooltip,
+			Tooltip:         self.c.Tr.MergeTagTooltip,
 			DisplayOnScreen: true,
 		},
 	}
