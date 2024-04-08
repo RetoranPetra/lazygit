@@ -244,7 +244,15 @@ func (self *TagsController) create() error {
 }
 
 func (self *TagsController) merge(tag *models.Tag) error {
-	return self.c.Helpers().MergeAndRebase.MergeRefIntoCheckedOutBranch(tag.RefName())
+	err := self.c.Helpers().MergeAndRebase.MergeRefIntoCheckedOutBranch(tag.RefName())
+	if err == nil {
+		context, ok := self.c.Helpers().View.ContextForView(self.c.Views().Branches.Name())
+		if !ok {
+			return nil
+		}
+		err = self.c.PushContext(context)
+	}
+	return err
 }
 
 func (self *TagsController) context() *context.TagsContext {
