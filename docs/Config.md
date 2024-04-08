@@ -19,7 +19,7 @@ If you want to change the config directory:
 JSON schema is available for `config.yml` so that IntelliSense in Visual Studio Code (completion and error checking) is automatically enabled when the [YAML Red Hat][yaml] extension is installed. However, note that automatic schema detection only works if your config file is in one of the standard paths mentioned above. If you override the path to the file, you can still make IntelliSense work by adding
 
 ```yaml
-# yaml-language-server: $schema=https://json.schemastore.org/lazygit.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jesseduffield/lazygit/master/schema/config.json
 ```
 
 to the top of your config file or via [Visual Studio Code settings.json config][settings].
@@ -87,6 +87,9 @@ gui:
   animateExplosion: true # shows an explosion animation when nuking the working tree
   portraitMode: 'auto' # one of 'auto' | 'never' | 'always'
   filterMode: 'substring' # one of 'substring' | 'fuzzy'; see 'Filtering' section below
+  spinner:
+    frames: ['|', '/', '-', '\\']
+    rate: 50 # spinner rate in milliseconds
 git:
   paging:
     colorArg: always

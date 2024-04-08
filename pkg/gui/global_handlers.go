@@ -109,6 +109,14 @@ func (gui *Gui) scrollDownConfirmationPanel() error {
 	return nil
 }
 
+func (gui *Gui) handleConfirmationClick() error {
+	if gui.Views.Confirmation.Editable {
+		return nil
+	}
+
+	return gui.handleGenericClick(gui.Views.Confirmation)
+}
+
 func (gui *Gui) handleCopySelectedSideContextItemToClipboard() error {
 	return gui.handleCopySelectedSideContextItemToClipboardWithTruncation(-1)
 }
@@ -137,7 +145,7 @@ func (gui *Gui) handleCopySelectedSideContextItemToClipboardWithTruncation(maxWi
 	}
 
 	if maxWidth > 0 {
-		itemId = itemId[:utils.Min(len(itemId), maxWidth)]
+		itemId = itemId[:min(len(itemId), maxWidth)]
 	}
 
 	gui.c.LogAction(gui.c.Tr.Actions.CopyToClipboard)
