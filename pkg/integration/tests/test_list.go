@@ -287,6 +287,7 @@ var tests = []*components.IntegrationTest{
 	tag.CrudLightweight,
 	tag.ForceTagAnnotated,
 	tag.ForceTagLightweight,
+	tag.Merge,
 	tag.Reset,
 	ui.Accordion,
 	ui.DoublePopup,
