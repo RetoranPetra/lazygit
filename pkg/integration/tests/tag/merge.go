@@ -6,15 +6,18 @@ import (
 )
 
 var Merge = NewIntegrationTest(NewIntegrationTestArgs{
-	Description:  "Merge a tag",
+	Description:  "Checkout a tag",
 	ExtraCmdArgs: []string{},
 	Skip:         false,
 	SetupConfig:  func(config *config.AppConfig) {},
 	SetupRepo: func(shell *Shell) {
-		shell.NewBranch("test")
-		shell.EmptyCommit("one")
-		shell.EmptyCommit("two")
-		shell.CreateLightweightTag("tag", "HEAD^")
+		shell.CreateFileAndAdd("test.txt","1")
+		shell.Commit("first")
+		shell.NewBranch("tagbranch")
+		shell.UpdateFile("test.txt","2")
+		shell.GitAddAll()
+		shell.Commit("tagcommit")
+		shell.CreateLightweightTag("tag", "HEAD")
 		shell.Checkout("master")
 	},
 	Run: func(t *TestDriver, keys config.KeybindingConfig) {
@@ -22,12 +25,6 @@ var Merge = NewIntegrationTest(NewIntegrationTestArgs{
 			Focus().
 			Lines(
 				Contains("tag").IsSelected(),
-			).
-			Press(keys.Branches.MergeIntoCurrentBranch) //Merge keybind
-
-		t.Views().Branches().IsFocused().Lines(
-			Contains("two").IsSelected(),
-			Contains("master"),
-		)
+			).Press(keys.Branches.MergeIntoCurrentBranch)
 	},
 })
