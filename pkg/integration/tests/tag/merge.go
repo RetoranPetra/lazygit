@@ -21,10 +21,13 @@ var Merge = NewIntegrationTest(NewIntegrationTestArgs{
 		shell.Checkout("master")
 	},
 	Run: func(t *TestDriver, keys config.KeybindingConfig) {
+		// Execute test
 		t.Views().Tags().
 			Focus().
 			Lines(
 				Contains("tag").IsSelected(),
 			).Press(keys.Branches.MergeIntoCurrentBranch)
+		t.Views().Confirmation().PressEnter()
+		// Assertions
 	},
 })
