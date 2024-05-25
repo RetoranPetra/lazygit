@@ -1,6 +1,8 @@
 package context
 
 import (
+	"errors"
+
 	"github.com/jesseduffield/lazygit/pkg/gui/keybindings"
 	"github.com/jesseduffield/lazygit/pkg/gui/style"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
@@ -103,7 +105,6 @@ func (self *MenuViewModel) GetNonModelItems() []*NonModelItem {
 	menuItems := self.FilteredListViewModel.GetItems()
 	var prevSection *types.MenuSection = nil
 	for i, menuItem := range menuItems {
-		menuItem := menuItem
 		if menuItem.Section != nil && menuItem.Section != prevSection {
 			if prevSection != nil {
 				result = append(result, &NonModelItem{
@@ -148,7 +149,7 @@ func (self *MenuContext) GetKeybindings(opts types.KeybindingsOpts) []*types.Bin
 func (self *MenuContext) OnMenuPress(selectedItem *types.MenuItem) error {
 	if selectedItem != nil && selectedItem.DisabledReason != nil {
 		if selectedItem.DisabledReason.ShowErrorInPanel {
-			return self.c.ErrorMsg(selectedItem.DisabledReason.Text)
+			return errors.New(selectedItem.DisabledReason.Text)
 		}
 
 		self.c.ErrorToast(self.c.Tr.DisabledMenuItemPrefix + selectedItem.DisabledReason.Text)

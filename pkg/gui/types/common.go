@@ -85,7 +85,7 @@ type IGuiCommon interface {
 	OnUIThread(f func() error)
 	// Runs a function in a goroutine. Use this whenever you want to run a goroutine and keep track of the fact
 	// that lazygit is still busy. See docs/dev/Busy.md
-	OnWorker(f func(gocui.Task))
+	OnWorker(f func(gocui.Task) error)
 	// Function to call at the end of our 'layout' function which renders views
 	// For example, you may want a view's line to be focused only after that view is
 	// resized, if in accordion mode.
@@ -131,11 +131,8 @@ type IModeMgr interface {
 }
 
 type IPopupHandler interface {
-	// Shows a popup with a (localized) "Error" caption and the given error message (in red).
-	//
-	// This is a convenience wrapper around Alert().
-	ErrorMsg(message string) error
-	Error(err error) error
+	// The global error handler for gocui. Not to be used by application code.
+	ErrorHandler(err error) error
 	// Shows a notification popup with the given title and message to the user.
 	//
 	// This is a convenience wrapper around Confirm(), thus the popup can be closed using both 'Enter' and 'ESC'.
@@ -168,16 +165,18 @@ type CreateMenuOptions struct {
 }
 
 type CreatePopupPanelOpts struct {
-	HasLoader           bool
-	Editable            bool
-	Title               string
-	Prompt              string
-	HandleConfirm       func() error
-	HandleConfirmPrompt func(string) error
-	HandleClose         func() error
+	HasLoader              bool
+	Editable               bool
+	Title                  string
+	Prompt                 string
+	HandleConfirm          func() error
+	HandleConfirmPrompt    func(string) error
+	HandleClose            func() error
+	HandleDeleteSuggestion func(int) error
 
 	FindSuggestionsFunc func(string) []*Suggestion
 	Mask                bool
+	AllowEditSuggestion bool
 }
 
 type ConfirmOpts struct {
@@ -195,9 +194,11 @@ type PromptOpts struct {
 	InitialContent      string
 	FindSuggestionsFunc func(string) []*Suggestion
 	HandleConfirm       func(string) error
+	AllowEditSuggestion bool
 	// CAPTURE THIS
-	HandleClose func() error
-	Mask        bool
+	HandleClose            func() error
+	HandleDeleteSuggestion func(int) error
+	Mask                   bool
 }
 
 type MenuSection struct {
