@@ -244,14 +244,14 @@ func (self *TagsController) create() error {
 }
 
 func (self *TagsController) merge(tag *models.Tag) error {
-	err := self.c.Helpers().MergeAndRebase.MergeRefIntoCheckedOutBranch(tag.RefName(), nil)
-	if err == nil {
+	err := self.c.Helpers().MergeAndRebase.MergeRefIntoCheckedOutBranch(tag.RefName(), func() error {
+		// Pass callback to swap to branches view on confirmation.
 		context, ok := self.c.Helpers().View.ContextForView(self.c.Views().Branches.Name())
 		if !ok {
 			return nil
 		}
-		err = self.c.PushContext(context)
-	}
+		return self.c.PushContext(context)
+	})
 	return err
 }
 
